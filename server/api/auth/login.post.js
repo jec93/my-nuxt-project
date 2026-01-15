@@ -1,84 +1,54 @@
-import bcrypt from 'bcryptjs'
-import prisma from '~/server/utils/prisma'
-import { generateToken } from '../../utils/jwt'
+import { signAccessToken } from '../../utils/jwt'
 
 export default defineEventHandler(async (event) => {
-  try {
-    const body = await readBody(event)
-    
-    if (!body.userid || !body.password) {
-      return {
-        success: false,
-        error: '아이디와 비밀번호를 입력해주세요.'
-      }
-    }
-    
-    // 사용자 조회
-    const user = await prisma.tbl_user.findUnique({
-      where: {
-        userid: body.userid
-      },
-      select: {
-        userid: true,
-        name: true,
-        password: true
-      }
+  const body = await readBody(event)
+  const { id, password } = body || {}
+
+  if (!id || !password) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'id/password required',
     })
-    
-    if (!user) {
-      return {
-        success: false,
-        error: '아이디 또는 비밀번호가 일치하지 않습니다.'
-      }
-    }
-    
-    // 비밀번호 확인
-    const isValid = await bcrypt.compare(body.password, user.password)
-    
-    if (!isValid) {
-      return {
-        success: false,
-        error: '아이디 또는 비밀번호가 일치하지 않습니다.'
-      }
-    }
-    
-    // JWT 토큰 생성
-    const token = generateToken({
-      userid: user.userid,
-      name: user.name
+  }
+
+  // 지금은 DB 없이 임시 로그인
+  if (!(id === 'test' && password === '1234')) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Invalid credentials',
     })
-    
-    // 쿠키에 토큰 저장
-    setCookie(event, 'auth_token', token, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24, // 24시간
-      path: '/'
-    })
-    
-    // 사용자 정보 쿠키 저장
-    setCookie(event, 'user_name', user.name, {
-      maxAge: 60 * 60 * 24,
-      path: '/'
-    })
-    
-    setCookie(event, 'user_id', user.userid, {
-      maxAge: 60 * 60 * 24,
-      path: '/'
-    })
-    
-    return {
-      success: true,
-      user: {
-        userid: user.userid,
-        name: user.name
-      }
-    }
-  } catch (error) {
-    console.error('Login error:', error)
-    return {
-      success: false,
-      error: error.message
-    }
+  }
+
+  // JWT 발급
+  const token = await signAccessToken({
+    sub: 'temp_test_user',
+    loginId: id,
+    role: 'USER',
+  })
+
+  // 보안용 JWT (JS에서 접근 불가)
+  setCookie(event, 'access_token', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,   // 개발환경
+    path: '/',
+    maxAge: 60 * 60 * 2,
+  })
+
+  // 로그인 상태 판단용 쿠키 (JS에서 읽음)
+  setCookie(event, 'logged_in', '1', {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: false,
+    path: '/',
+    maxAge: 60 * 60 * 2,
+  })
+
+  return {
+    ok: true,
+    user: {
+      loginId: id,
+      role: 'USER',
+    },
   }
 })

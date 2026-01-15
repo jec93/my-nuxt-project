@@ -1,16 +1,20 @@
-import jwt from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+function secretKey() {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET is missing in .env')
+  return new TextEncoder().encode(secret)
+}
 
-export const generateToken = (payload) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
-};
+export async function signAccessToken(payload) {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('2h')
+    .sign(secretKey())
+}
 
-//성공 시 디코딩된 토큰 리턴, 실패 시 null 리턴
-export const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    return null;
-  }
-};
+export async function verifyAccessToken(token) {
+  const { payload } = await jwtVerify(token, secretKey())
+  return payload
+}
