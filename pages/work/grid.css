@@ -1,0 +1,60 @@
+.wrap {
+  padding: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field .label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+
+.kpi {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+:deep(.ant-input),
+:deep(.ant-select-selector),
+:deep(.ant-picker) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+:deep(.ant-input:hover),
+:deep(.ant-select-selector:hover),
+:deep(.ant-picker:hover) {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+:deep(.ant-input:focus),
+:deep(.ant-input-focused),
+:deep(.ant-select-focused .ant-select-selector),
+:deep(.ant-picker-focused) {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+
+/* 글자/플레이스홀더 대비 */
+:deep(.ant-input),
+:deep(.ant-select-selection-item),
+:deep(.ant-picker-input > input) {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+:deep(.ant-input::placeholder),
+:deep(.ant-select-selection-placeholder),
+:deep(.ant-picker-input > input::placeholder) {
+  color: rgba(255, 255, 255, 0.55);
+}
+:deep(.ant-card) {
+  background: rgba(255, 255, 255, 0.03);
+}

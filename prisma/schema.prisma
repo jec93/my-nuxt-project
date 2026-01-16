@@ -1,33 +1,54 @@
+datasource db {
+  provider = "postgresql"
+}
+
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+model User {
+  id        String   @id @default(uuid())
+  loginId   String   @unique
+  password  String
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
 }
 
-model tbl_board {
-  bno      Int       @id @default(autoincrement())
-  userid   String    @db.VarChar(50)
-  writer   String    @db.VarChar(50)
-  title    String    @db.VarChar(200)
-  content  String    @db.Text
-  hitno    Int?      @default(0)
-  regdate  DateTime? @default(now()) @db.Timestamp(0)
-  tbl_user tbl_user  @relation(fields: [userid], references: [userid], onUpdate: Restrict, map: "tbl_board_ibfk_1")
+model Menu {
+  screenKey String  @id
+  parentKey String?
+  label     String
 
-  @@index([userid], map: "userid")
+  // 선택
+  url       String?
+  domain    String?
+
+  // 운영/정렬
+  depth     Int
+  order     Int
+  isActive  Boolean @default(true)
+
+  // 관계
+  parent   Menu?  @relation("MenuTree", fields: [parentKey], references: [screenKey], onDelete: SetNull)
+  children Menu[] @relation("MenuTree")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentKey, order])
+  @@index([depth])
 }
 
-model tbl_user {
-  userid    String      @id @db.VarChar(50)
-  name      String      @db.VarChar(50)
-  password  String      @db.VarChar(255)
-  email     String?     @db.VarChar(100)
-  job       String?     @db.VarChar(20)
-  hobbies   String?     @db.VarChar(100)
-  gender    String?     @db.VarChar(10)
-  regdate   DateTime?   @default(now()) @db.Timestamp(0)
-  tbl_board tbl_board[]
+model WorkItem {
+  id        BigInt   @id @default(autoincrement())
+  domain    String   @db.VarChar(80) // menu의 domain과 매칭
+  title     String   @db.VarChar(200)
+  status    String   @db.VarChar(20) // 대기/진행/완료
+  owner     String?  @db.VarChar(50)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([domain])
+  @@index([status])
+  @@index([createdAt])
 }

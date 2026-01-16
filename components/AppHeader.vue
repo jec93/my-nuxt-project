@@ -26,9 +26,9 @@ const onLogout = async () => {
   try {
     await $fetch('/api/auth/logout', { method: 'POST' })
   } catch (e) {
-    // 없어도 OK (쿠키 지우는 API가 없다면 다음 단계에서 만들면 됨)
+    
   }
-  // 쿠키 직접 제거(프론트에서도 가능)
+  // 쿠키 직접 제거
   const token = useCookie('access_token')
   token.value = null
 

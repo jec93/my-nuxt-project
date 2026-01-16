@@ -1,42 +1,48 @@
 <template>
-  <a-layout class="app">
-    <a-layout-sider
-      v-model:collapsed="collapsed"
-      collapsible
-      :width="240"
-      class="sider"
-    >
-      <AppSidebar :collapsed="collapsed" />
+  <a-layout style="min-height: 100vh;">
+    <a-layout-sider collapsible v-model:collapsed="collapsed" width="260">
+      <div class="logo">My App</div>
+      <AppSidebar />
     </a-layout-sider>
 
     <a-layout>
       <a-layout-header class="header">
-        <AppHeader :collapsed="collapsed" @toggle="collapsed = !collapsed" />
+        <AppHeader />
       </a-layout-header>
 
       <a-layout-content class="content">
-        <slot />
+        <NuxtPage />
       </a-layout-content>
     </a-layout>
   </a-layout>
 </template>
 
 <script setup>
-import AppHeader from '~/components/AppHeader.vue'
 import AppSidebar from '~/components/AppSidebar.vue'
+import AppHeader from '~/components/AppHeader.vue'
 
 const collapsed = ref(false)
 </script>
 
 <style scoped>
-.app { min-height: 100vh; }
-.sider { background: #001529; }
-.header {
-  background: #fff;
+.logo{
+  height: 48px;
+  display:flex;
+  align-items:center;
   padding: 0 16px;
-  display: flex;
-  align-items: center;
+  color: #fff;
+  font-weight: 700;
+}
+.header{
+  padding: 0 16px;
+  display:flex;
+  align-items:center;
+  background: #fff;
   border-bottom: 1px solid #f0f0f0;
 }
-.content { padding: 16px; background: #f5f5f5; min-height: calc(100vh - 64px); }
+.content{
+  padding: 16px;
+  background: #f5f5f5;
+  min-height: calc(100vh - 64px);
+}
 </style>
