@@ -12,7 +12,7 @@
 
 .field .label {
   font-size: 12px;
-  opacity: 0.75;
+  opacity: 0.85;
   margin-bottom: 6px;
 }
 
@@ -22,39 +22,67 @@
   margin-top: 4px;
 }
 
+/* =========================
+   Input / Select / Picker
+   ========================= */
 :deep(.ant-input),
 :deep(.ant-select-selector),
 :deep(.ant-picker) {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
-:deep(.ant-input:hover),
-:deep(.ant-select-selector:hover),
-:deep(.ant-picker:hover) {
+  background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.35);
 }
 
+/* hover */
+:deep(.ant-input:hover),
+:deep(.ant-select-selector:hover),
+:deep(.ant-picker:hover) {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* focus */
 :deep(.ant-input:focus),
 :deep(.ant-input-focused),
 :deep(.ant-select-focused .ant-select-selector),
 :deep(.ant-picker-focused) {
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.85);
   box-shadow: none;
 }
 
-/* 글자/플레이스홀더 대비 */
+/* text */
 :deep(.ant-input),
 :deep(.ant-select-selection-item),
 :deep(.ant-picker-input > input) {
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
 }
 
+/* placeholder (중요) */
 :deep(.ant-input::placeholder),
 :deep(.ant-select-selection-placeholder),
 :deep(.ant-picker-input > input::placeholder) {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.6);
 }
+
+/* =========================
+   Checkbox (존재감 회복)
+   ========================= */
+:deep(.ant-checkbox-inner) {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+:deep(.ant-checkbox-checked .ant-checkbox-inner) {
+  background-color: #1677ff;
+  border-color: #1677ff;
+}
+
+:deep(.ant-checkbox-wrapper) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* =========================
+   Card (ERP 배경)
+   ========================= */
 :deep(.ant-card) {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
 }

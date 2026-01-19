@@ -1,10 +1,24 @@
 <script setup>
+import { message } from 'ant-design-vue'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const domain = computed(() => String(route.query.domain || ''))
 const hasValidDomain = computed(()=> !!domain.value)
+
+const breadcrumbs = ref([])
+
+async function loadBreadcrumb() {
+  if(!domain.value) {
+    breadcrumbs.value = []
+    return
+  }
+
+  breadcrumbs.value = await $fetch('/api/menus/breadcrumb', {
+    params : {domain : domain.value},
+  })
+}
 
 // domain -> title
 const titleMap = {
@@ -41,12 +55,29 @@ const pagination = ref({
   showSizeChanger: true,
 })
 
-// selection (ERP 느낌: 일괄처리)
+// selection
 const selectedRowKeys = ref([])
+const selectedRows = ref([])
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys) => (selectedRowKeys.value = keys),
+  onChange: (keys,rows) => {
+    //완료상태 걸러내기
+    const valid = rows.filter(r=>r.status !== '완료')
+    selectedRowKeys.value = valid.map(r=>r.id)
+    selectedRows.value = valid
+    if(rows.length !== valid.length){
+      message.warn('완료 항목은 일괄처리 대상에서 제외됩니다!')
+    }
+  },
+  getCheckboxProps:(record) => ({
+    disabled:record.status === '완료'
+  })
 }))
+
+const canBulk = computed(()=> {
+  if(!selectedRows.value.length) return false
+  return selectedRows.value.every(r => r.status === '대기' || r.status === '진행')
+})
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 90 },
@@ -60,13 +91,7 @@ function rowKey(r) {
   return r.id
 }
 
-// KPI 요약
-const summary = computed(() => {
-  const total = pagination.value.total || rows.value.length
-  const inProgress = rows.value.filter(r => r.status === '진행').length
-  const done = rows.value.filter(r => r.status === '완료').length
-  return { total, inProgress, done }
-})
+const summary = ref({total : 0, waiting : 0, inProgress: 0, done : 0 })
 
 async function fetchRowsByDomain(d, { keyword, status, page, pageSize }) {
   return await $fetch('/api/work/items', {
@@ -100,6 +125,7 @@ async function load() {
 
     rows.value = res.rows
     pagination.value.total = res.total
+    summary.value = res.summary
   } finally {
     loading.value = false
   }
@@ -119,13 +145,25 @@ function resetFilters() {
   load()
 }
 
-function bulkAction() {
-  // 지금은 더미: 선택된 row ids로 뭔가 처리하는 느낌만
-  console.log('bulkAction keys:', selectedRowKeys.value)
+async function bulkAction() {
+  if(!canBulk.value){
+    message.warning('일괄처리는 대기/진행 상태만 가능합니다!')
+    return
+  }
+
+  const res = await $fetch('/api/work/bulk',{
+    method : 'POST',
+    body : {ids: selectedRowKeys.value, action: 'complete'},
+  })
+  message.success(`일괄 처리 완료 : ${res.count} 건`)
+  selectedRowKeys.value = []
+  selectedRows.value = []
+  load()
 }
 
 // domain 바뀌면 상태 리셋
 watch(domain, () => {
+  loadBreadcrumb()
   selectedRowKeys.value = []
   pagination.value.current = 1
   load()
@@ -140,9 +178,12 @@ watch(domain, () => {
   <div class="wrap">
     <!--Breadcrumb-->
     <a-breadcrumb style="margin-bottom: 12px">
-      <a-breadcrumb-item>업무</a-breadcrumb-item>
-      <a-breadcrumb-item>그리드</a-breadcrumb-item>
-      <a-breadcrumb-item>{{ pageTitle }}</a-breadcrumb-item>
+      <a-breadcrumb-item
+        v-for="item in  breadcrumbs"
+        :key="item.screenKey"
+      >
+        {{ item.label }}
+      </a-breadcrumb-item>
     </a-breadcrumb>
 
     <!--Header-->
@@ -159,7 +200,7 @@ watch(domain, () => {
       <a-space>
         <a-button @click="resetFilters">초기화</a-button>
         <a-button @click="load">조회</a-button>
-        <a-button type="primary" :disabled="!selectedRowKeys.length" @click="bulkAction">
+        <a-button type="primary" :disabled="!canBulk" @click="bulkAction">
           일괄처리
         </a-button>
       </a-space>
@@ -205,19 +246,25 @@ watch(domain, () => {
 
       <!--Summary-->
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
-        <a-col :xs="24" :md="8">
+        <a-col :xs="24" :md="6">
           <a-card>
             <a-typography-text type="secondary">전체</a-typography-text>
             <div class="kpi">{{ summary.total }}</div>
           </a-card>
         </a-col>
-        <a-col :xs="24" :md="8">
+        <a-col :xs="24" :md="6">
+          <a-card>
+            <a-typography-text type="secondary">대기</a-typography-text>
+            <div class="kpi">{{ summary.waiting }}</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :md="6">
           <a-card>
             <a-typography-text type="secondary">진행</a-typography-text>
             <div class="kpi">{{ summary.inProgress }}</div>
           </a-card>
         </a-col>
-        <a-col :xs="24" :md="8">
+        <a-col :xs="24" :md="6">
           <a-card>
             <a-typography-text type="secondary">완료</a-typography-text>
             <div class="kpi">{{ summary.done }}</div>
