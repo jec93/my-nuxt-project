@@ -124,7 +124,7 @@ async function seedMenus() {
   }
 
   const cnt = await prisma.menu.count()
-  console.log(`✅ Seeded menus (synced): ${cnt}`)
+  console.log(`Seeded menus (synced): ${cnt}`)
 }
 
 async function seedWorkItems() {
@@ -143,7 +143,7 @@ async function seedWorkItems() {
   await prisma.workItem.createMany({ data: items })
 
   const cnt = await prisma.workItem.count()
-  console.log(`✅ Seeded work items: ${cnt}`)
+  console.log(`Seeded work items: ${cnt}`)
 }
 
 async function main() {

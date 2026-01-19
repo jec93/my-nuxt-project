@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const token = await signAccessToken({
-    sub: user.id,
+    userId: user.id.toString(),
     loginId: user.loginId,
     role: user.role,
   })

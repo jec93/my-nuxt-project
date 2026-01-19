@@ -1,12 +1,63 @@
 <template>
   <div class="wrap">
-    <a-typography-text class="sectionTitle">즐겨찾기</a-typography-text>
-    <a-menu
-      mode="inline"
-      :items="favoriteItems"
-      :selectedKeys="selectedKeys"
-      @click="onFavoriteClick"
-    />
+    <div class="favHeader">
+      <!-- 즐겨찾기 텍스트를 클릭하면 dropdown -->
+      <a-dropdown trigger="click">
+        <span class="favTitle">
+          즐겨찾기 ▼
+        </span>
+
+        <template #overlay>
+          <a-menu :items="favoriteMenuItems" @click="onFavoriteClick" />
+        </template>
+      </a-dropdown>
+
+      <!-- 톱니 버튼은 별도로 -->
+      <a-button size="small" @click="openFavoriteModal">⚙</a-button>
+    </div>
+
+    <a-modal
+      v-model:open="favoriteModalOpen"
+      title="즐겨찾기 관리"
+      width="900px"
+      :maskClosable="false"
+      @ok="saveFavorites"
+    >
+      <a-row :gutter="12">
+        <!-- 좌: 전체 메뉴 트리 -->
+        <a-col :span="10">
+          <a-card size="small" title="전체 메뉴">
+            <a-tree
+              checkable
+              :tree-data="favoriteMenuTree"
+              v-model:checkedKeys="checkedKeys"
+              :checkStrictly="true"
+            />
+          </a-card>
+        </a-col>
+
+        <!-- 중: 화살표 -->
+        <a-col :span="4" style="display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;">
+          <a-button @click="addCheckedToFavorites">→</a-button>
+          <a-button @click="removeSelectedFromFavorites">←</a-button>
+        </a-col>
+
+        <!-- 우: 즐겨찾기 리스트 -->
+        <a-col :span="10">
+          <a-card size="small" title="즐겨찾기">
+            <a-list :data-source="favDraft" bordered>
+              <template #renderItem="{ item }">
+                <a-list-item>
+                  <div style="flex:1">{{ item.label }}</div>
+                  <a-button size="small" danger @click="removeFavorite(item.screenKey)">삭제</a-button>
+                </a-list-item>
+              </template>
+            </a-list>
+          </a-card>
+        </a-col>
+      </a-row>
+    </a-modal>
+
 
     <a-divider style="margin: 12px 0;" />
 
@@ -23,20 +74,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
-// ===== 라우터
+// 라우터
 const router = useRouter()
 const route = useRoute()
 
-// ===== 즐겨찾기(지금은 하드코딩 유지, 추후 DB로 교체)
-const favoriteItems = [
-  { key: '/', label: '대시보드' },
-  { key: '/menu', label: '메뉴 관리(예정)' },
-]
-
-// ===== DB 메뉴 로드
+// DB 메뉴 로드
 const { data } = await useFetch('/api/menus')
 const flatMenus = computed(() => data.value?.menus ?? [])
 
@@ -65,6 +110,19 @@ function buildMenuTree(list = []) {
 
   return roots
 }
+
+const favorites = ref([]) // [{screenKey,label,url,domain,depth}]
+const favoriteMenuItems = computed(() =>
+  favorites.value.map(f => ({
+    key: f.screenKey,
+    label: f.label,
+  }))
+)
+
+async function loadFavorites() {
+  favorites.value = await $fetch('/api/favorites/favorites')
+}
+onMounted(loadFavorites)
 
 function toAntdMenuItems(tree = []) {
   const convert = (node) => ({
@@ -143,9 +201,15 @@ const onOpenChange = (nextOpenKeys) => {
 }
 
 // ===== 클릭 핸들러 분리
-const onFavoriteClick = ({ key }) => {
-  selectedKeys.value = [String(key)]
-  router.push(String(key))
+function onFavoriteClick({ key }) {
+  const fav = favorites.value.find(f => f.screenKey === key)
+  if (!fav) return
+  // leaf 클릭 이동: url + domain
+  if (fav.url === '/work/grid') {
+    router.push({ path: fav.url, query: { domain: fav.domain } })
+  } else {
+    router.push(fav.url)
+  }
 }
 
 const onMenuClick = ({ key }) => {
@@ -164,6 +228,99 @@ const onMenuClick = ({ key }) => {
     query: { domain: menu.domain ?? '' },
   })
 }
+
+// ======================
+// 즐겨찾기 모달
+// ======================
+const favoriteModalOpen = ref(false)
+
+// 좌측 트리 체크
+const checkedKeys = ref([])
+
+// 우측 즐겨찾기 draft (모달에서 편집용)
+const favDraft = ref([])
+
+// leaf 판단: 지금 너 구조는 leaf만 url+domain이 있음
+function isLeafMenu(m) {
+  return m && m.depth === 3 && !!m.url && !!m.domain
+}
+
+// 모달용 트리: 1/2depth는 체크 비활성화, leaf만 체크 가능하게
+const favoriteMenuTree = computed(() => {
+  const convert = (node) => {
+    const leaf = isLeafMenu(node)
+    return {
+      key: node.screenKey,
+      title: node.label,              // a-tree는 label이 아니라 title
+      disabled: !leaf && node.depth !== 1 && node.depth !== 2 ? false : !leaf, 
+      // 위 줄이 헷갈리면 아래처럼 단순하게:
+      // disabled: !leaf,  // ✅ leaf만 체크 가능
+      children: node.children?.length ? node.children.map(convert) : undefined,
+    }
+  }
+  return tree.value.map(convert)
+})
+
+async function openFavoriteModal() {
+  // 최신 즐겨찾기 로드 후 복사
+  await loadFavorites()
+  favDraft.value = [...favorites.value]
+  checkedKeys.value = []
+  favoriteModalOpen.value = true
+}
+
+// 체크한 leaf를 즐겨찾기에 추가(중복 방지)
+function addCheckedToFavorites() {
+  const keys = Array.isArray(checkedKeys.value)
+    ? checkedKeys.value
+    : (checkedKeys.value?.checked || [])
+
+  const leafMap = new Map(
+    flatMenus.value
+      .filter(isLeafMenu)
+      .map(m => [m.screenKey, m])
+  )
+
+  const exist = new Set(favDraft.value.map(f => f.screenKey))
+
+  for (const k of keys) {
+    const m = leafMap.get(k)
+    if (!m) continue
+    if (exist.has(m.screenKey)) continue
+
+    favDraft.value.push({
+      screenKey: m.screenKey,
+      label: m.label,
+      url: m.url,
+      domain: m.domain,
+      depth: m.depth,
+    })
+    exist.add(m.screenKey)
+  }
+}
+
+// 우측 리스트에서 개별 삭제
+function removeFavorite(screenKey) {
+  favDraft.value = favDraft.value.filter(f => f.screenKey !== screenKey)
+}
+
+// 저장(전체 덮어쓰기 PUT)
+async function saveFavorites() {
+  const menuKeys = favDraft.value.map(f => f.screenKey)
+
+  await $fetch('/api/favorites/favorites', {
+    method: 'PUT',
+    body: { menuKeys },
+  })
+
+  favoriteModalOpen.value = false
+  await loadFavorites()
+}
+
+// (선택) ← 버튼 기능: 지금은 비워둬도 됨
+function removeSelectedFromFavorites() {
+  // 나중에 “우측 리스트 선택” UX를 넣을 때 구현
+}
 </script>
 
 <style scoped>
@@ -175,4 +332,22 @@ const onMenuClick = ({ key }) => {
   padding: 6px 8px;
   color: rgba(255,255,255,0.7);
 }
+.favHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 6px 8px;
+}
+
+.favTitle{
+  font-weight: 700;
+  color: #ffffff;          /* 라이트 기준 */
+  cursor: pointer;
+  user-select: none;
+}
+
+.favTitle:hover{
+  text-decoration: underline;
+}
+
 </style>

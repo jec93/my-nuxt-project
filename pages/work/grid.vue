@@ -84,7 +84,12 @@ const columns = [
   { title: '제목', dataIndex: 'title', key: 'title' },
   { title: '상태', dataIndex: 'status', key: 'status', width: 120 },
   { title: '담당', dataIndex: 'owner', key: 'owner', width: 120 },
-  { title: '등록일', dataIndex: 'createdAt', key: 'createdAt', width: 140 },
+  { title: '등록일', dataIndex: 'createdAt', key: 'createdAt',
+  customRender:({text}) => {
+    if(!text) return ''
+    return text.split('T')[0]
+  },
+  width: 140 },
 ]
 
 function rowKey(r) {
