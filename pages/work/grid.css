@@ -10,6 +10,20 @@
   margin-bottom: 12px;
 }
 
+.titleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* 긴 제목일 때 레이아웃 안정 */
+}
+
+.titleRow :deep(.ant-typography) {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .field .label {
   font-size: 12px;
   opacity: 0.85;
@@ -85,4 +99,24 @@
 :deep(.ant-card) {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.15);
+}
+
+/*
+북마크 버튼
+*/
+.favStarBtn{
+  padding: 0 6px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.favStar{
+  font-size: 20px;
+  line-height: 1;
+  color: #8c8c8c;
+}
+
+.favStar.on{
+  color: #faad14;
 }

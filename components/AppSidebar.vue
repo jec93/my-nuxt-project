@@ -1,79 +1,5 @@
-<template>
-  <div class="wrap">
-    <div class="favHeader">
-      <!-- 즐겨찾기 텍스트를 클릭하면 dropdown -->
-      <a-dropdown trigger="click">
-        <span class="favTitle">
-          즐겨찾기 ▼
-        </span>
-
-        <template #overlay>
-          <a-menu :items="favoriteMenuItems" @click="onFavoriteClick" />
-        </template>
-      </a-dropdown>
-
-      <!-- 톱니 버튼은 별도로 -->
-      <a-button size="small" @click="openFavoriteModal">⚙</a-button>
-    </div>
-
-    <a-modal
-      v-model:open="favoriteModalOpen"
-      title="즐겨찾기 관리"
-      width="900px"
-      :maskClosable="false"
-      @ok="saveFavorites"
-    >
-      <a-row :gutter="12">
-        <!-- 좌: 전체 메뉴 트리 -->
-        <a-col :span="10">
-          <a-card size="small" title="전체 메뉴">
-            <a-tree
-              checkable
-              :tree-data="favoriteMenuTree"
-              v-model:checkedKeys="checkedKeys"
-              :checkStrictly="true"
-            />
-          </a-card>
-        </a-col>
-
-        <!-- 중: 화살표 -->
-        <a-col :span="4" style="display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;">
-          <a-button @click="addCheckedToFavorites">→</a-button>
-          <a-button @click="removeSelectedFromFavorites">←</a-button>
-        </a-col>
-
-        <!-- 우: 즐겨찾기 리스트 -->
-        <a-col :span="10">
-          <a-card size="small" title="즐겨찾기">
-            <a-list :data-source="favDraft" bordered>
-              <template #renderItem="{ item }">
-                <a-list-item>
-                  <div style="flex:1">{{ item.label }}</div>
-                  <a-button size="small" danger @click="removeFavorite(item.screenKey)">삭제</a-button>
-                </a-list-item>
-              </template>
-            </a-list>
-          </a-card>
-        </a-col>
-      </a-row>
-    </a-modal>
-
-
-    <a-divider style="margin: 12px 0;" />
-
-    <a-typography-text class="sectionTitle">전체 메뉴</a-typography-text>
-    <a-menu
-      mode="inline"
-      :items="menuItems"
-      :openKeys="openKeys"
-      :selectedKeys="selectedKeys"
-      @openChange="onOpenChange"
-      @click="onMenuClick"
-    />
-  </div>
-</template>
-
 <script setup>
+import { message } from 'ant-design-vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -216,7 +142,7 @@ const onMenuClick = ({ key }) => {
   const menu = menuMap.value.get(String(key))
   if (!menu) return
 
-  // 1~2depth는 url이 없으니 이동 X (펼침 전용)
+  // 1~2depth는 펼침
   if (!menu.url) return
 
   selectedKeys.value = [menu.screenKey]
@@ -251,10 +177,9 @@ const favoriteMenuTree = computed(() => {
     const leaf = isLeafMenu(node)
     return {
       key: node.screenKey,
-      title: node.label,              // a-tree는 label이 아니라 title
+      title: node.label,
       disabled: !leaf && node.depth !== 1 && node.depth !== 2 ? false : !leaf, 
-      // 위 줄이 헷갈리면 아래처럼 단순하게:
-      // disabled: !leaf,  // ✅ leaf만 체크 가능
+      // disabled: !leaf
       children: node.children?.length ? node.children.map(convert) : undefined,
     }
   }
@@ -317,9 +242,104 @@ async function saveFavorites() {
   await loadFavorites()
 }
 
-// (선택) ← 버튼 기능: 지금은 비워둬도 됨
-function removeSelectedFromFavorites() {
-  // 나중에 “우측 리스트 선택” UX를 넣을 때 구현
+const currentUserId = computed(() => 'admin') 
+
+async function shareFavorite(item) {
+  console.log('shareFavorite payload', {
+    toUserId: currentUserId.value,
+    menuKey: item?.screenKey,
+    item,
+  })  
+  try {
+    if (!currentUserId.value) {
+      message.warning('로그인 정보(userId)를 찾을 수 없어요')
+      return
+    }
+
+    await $fetch('/api/share/send', {
+      method: 'POST',
+      body: {
+        toUserId: currentUserId.value,
+        menuKey: item.screenKey,
+        message: `즐겨찾기 공유: ${item.label}`,
+      },
+    })
+    message.success('공유 알림을 보냈어요')
+  } catch (e) {
+    console.log(e)
+    message.error('공유에 실패했어요')
+  }
+}
+
+function closeFavoriteModal() {
+  favoriteModalOpen.value = false
+}
+
+onMounted(() => {
+  loadFavorites()
+  window.addEventListener('favorites:changed', loadFavorites)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('favorites:changed', loadFavorites)
+})
+
+const shareModalOpen = ref(false)
+const shareTargetId = ref(null)   // 선택한 유저 id
+const shareUsers = ref([])
+const shareLoading = ref(false)
+const shareQuery = ref('')
+const shareItem = ref(null)       // 어떤 즐겨찾기를 공유하는지
+
+async function openShareModal(item) {
+  shareItem.value = item
+  shareTargetId.value = null
+  shareQuery.value = ''
+  shareModalOpen.value = true
+  await loadUsers()
+}
+
+async function loadUsers() {
+  shareLoading.value = true
+  try {
+    const res = await $fetch('/api/users/list', {
+      query: shareQuery.value ? { q: shareQuery.value } : {},
+    })
+    shareUsers.value = res.users || []
+  } catch (e) {
+    console.log(e)
+    message.error('사용자 목록을 불러오지 못했어요')
+  } finally {
+    shareLoading.value = false
+  }
+}
+
+let shareSearchTimer = null
+watch(shareQuery, () => {
+  clearTimeout(shareSearchTimer)
+  shareSearchTimer = setTimeout(loadUsers, 250) // 간단 디바운스
+})
+
+async function confirmShare() {
+  if (!shareItem.value) return
+  if (!shareTargetId.value) {
+    message.warning('공유 대상을 선택해 주세요')
+    return
+  }
+
+  try {
+    await $fetch('/api/share/send', {
+      method: 'POST',
+      body: {
+        toUserId: shareTargetId.value,
+        menuKey: shareItem.value.screenKey,
+        message: `즐겨찾기 공유: ${shareItem.value.label}`,
+      },
+    })
+    message.success('공유 알림을 보냈어요')
+    shareModalOpen.value = false
+  } catch (e) {
+    message.error('공유에 실패했어요')
+  }
 }
 </script>
 
@@ -350,4 +370,173 @@ function removeSelectedFromFavorites() {
   text-decoration: underline;
 }
 
+.favActions {
+  display: flex;
+  gap: 4px;
+}
+
+.userList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+}
+
+.userText {
+  min-width: 0;
+}
+
+.userName {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.userSub {
+  font-size: 12px;
+  opacity: 0.75;
+}
 </style>
+
+<template>
+  <div class="wrap">
+    <div class="favHeader">
+      <!-- 즐겨찾기 텍스트를 클릭하면 dropdown -->
+      <a-dropdown trigger="click">
+        <span class="favTitle">
+          즐겨찾기 ▼
+        </span>
+
+        <template #overlay>
+          <a-menu :items="favoriteMenuItems" @click="onFavoriteClick" />
+        </template>
+      </a-dropdown>
+
+      <!-- 톱니 버튼은 별도로 -->
+      <a-button size="small" @click="openFavoriteModal">⚙</a-button>
+    </div>
+
+<!-- 즐겨찾기 관리 모달 부분 -->
+    <a-modal
+      v-model:open="favoriteModalOpen"
+      title="즐겨찾기 관리"
+      width="900px"
+      :maskClosable="false"
+      @ok="saveFavorites"
+    >
+      <a-row :gutter="12">
+        <!-- 좌: 전체 메뉴 트리 -->
+        <a-col :span="10">
+          <a-card size="small" title="전체 메뉴">
+            <a-tree
+              checkable
+              :tree-data="favoriteMenuTree"
+              v-model:checkedKeys="checkedKeys"
+              :checkStrictly="true"
+            />
+          </a-card>
+        </a-col>
+
+        <!-- 중: 화살표 -->
+        <a-col :span="4" style="display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;">
+          <a-button @click="addCheckedToFavorites">→</a-button>
+          <a-button @click="removeSelectedFromFavorites">←</a-button>
+        </a-col>
+
+        <!-- 우: 즐겨찾기 리스트 -->
+        <a-col :span="10">
+          <a-card size="small" title="즐겨찾기">
+            <a-list :data-source="favDraft" bordered>
+              <template #renderItem="{ item }">
+                <a-list-item>
+                  <div style="flex:1">{{ item.label }}</div>
+                  <div class="favActions">
+                    <!-- ✅ 공유 버튼 -->
+                    <a-tooltip title="공유 알림 보내기">
+                      <a-button type="text" size="small" @click="openShareModal(item)">
+                        공유
+                      </a-button>
+                    </a-tooltip>
+
+                    <!-- 삭제 버튼 -->
+                    <a-tooltip title="즐겨찾기에서 제거">
+                      <a-button
+                        size="small"
+                        danger
+                        @click="removeFavorite(item.screenKey)"
+                      >
+                        삭제
+                      </a-button>
+                    </a-tooltip>
+                  </div>
+                </a-list-item>
+              </template>
+            </a-list>
+          </a-card>
+        </a-col>
+      </a-row>
+    </a-modal>
+    <a-modal
+      v-model:open="shareModalOpen"
+      title="공유 대상 선택"
+      :destroyOnClose="true"
+      @ok="confirmShare"
+    >
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <a-input
+          v-model:value="shareQuery"
+          placeholder="이름 또는 아이디 검색"
+          allow-clear
+        />
+
+        <a-spin :spinning="shareLoading">
+          <a-radio-group v-model:value="shareTargetId" style="width:100%">
+            <div v-if="shareUsers.length === 0">
+              <a-empty description="사용자가 없습니다." />
+            </div>
+
+            <div v-else class="userList">
+              <label v-for="u in shareUsers" :key="u.id" class="userRow">
+                <a-radio :value="u.id" />
+                <div class="userText">
+                  <div class="userName">{{ u.name }}</div>
+                  <div class="userSub">{{ u.loginId }}</div>
+                </div>
+              </label>
+            </div>
+          </a-radio-group>
+        </a-spin>
+
+        <div v-if="shareItem" style="opacity:.8; font-size:12px;">
+          공유 항목: {{ shareItem.label }}
+        </div>
+      </div>
+    </a-modal>
+
+    <a-divider style="margin: 12px 0;" />
+
+    <!-- 전체 메뉴 -->
+
+    <a-typography-text class="sectionTitle">전체 메뉴</a-typography-text>
+    <a-menu
+      mode="inline"
+      :items="menuItems"
+      :openKeys="openKeys"
+      :selectedKeys="selectedKeys"
+      @openChange="onOpenChange"
+      @click="onMenuClick"
+    />
+  </div>
+</template>

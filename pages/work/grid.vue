@@ -7,6 +7,46 @@ const route = useRoute()
 const domain = computed(() => String(route.query.domain || ''))
 const hasValidDomain = computed(()=> !!domain.value)
 
+const menuKey = ref('')
+const isFavorite = ref(false)
+const favLoading = ref(false)
+
+async function loadFavoriteState(){
+  if(!domain.value){
+    menuKey.value = ''
+    isFavorite.value = false
+    return
+  }
+
+  const menu = await $fetch('/api/menus/by-domain', { params: { domain: domain.value } })
+  menuKey.value = menu?.screenKey || ''
+
+  if (!menuKey.value) {
+    isFavorite.value = false
+    return
+  }
+  const favs = await $fetch('/api/favorites/favorites')
+  isFavorite.value = favs.some(f => f.screenKey === menuKey.value)
+}
+
+watch(domain, loadFavoriteState ,{ immediate: true })
+
+async function toggleFavorite(){
+  if(!menuKey.value || favLoading.value) return
+  favLoading.value = true
+  try{
+    const res=await $fetch('/api/favorites/toggle',{
+      method : 'POST',
+      body : {menuKey : menuKey.value},
+    })
+    isFavorite.value = !!res.isFavorite
+
+    window.dispatchEvent(new Event('favorites:changed'))
+  }finally{
+    favLoading.value = false
+  }
+}
+
 const breadcrumbs = ref([])
 
 async function loadBreadcrumb() {
@@ -20,15 +60,10 @@ async function loadBreadcrumb() {
   })
 }
 
-// domain -> title
-const titleMap = {
-  'ops.tasks.all': '전체 작업',
-  'ops.tasks.my': '내 작업',
-  'collab.notice.all': '전체 공지',
-  'report.metric.kpi': 'KPI',
-}
-
-const pageTitle = computed(() => titleMap[domain.value] || '업무 화면')
+const pageTitle = computed(() => {
+  const last = breadcrumbs.value?.[breadcrumbs.value.length - 1]
+  return last?.label || '업무 화면'
+})
 
 // loading/spin
 const loading = ref(false)
@@ -193,10 +228,23 @@ watch(domain, () => {
 
     <!--Header-->
     <div class="pageHeader">
-      <div>
+      <div class="titleRow">
         <a-typography-title :level="3" style="margin: 0">
           {{ pageTitle }}
         </a-typography-title>
+
+        <a-tooltip :title="isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'">
+          <a-button
+            type="text"
+            class="favStarBtn"
+            :loading="favLoading"
+            @click="toggleFavorite"
+          >
+            <span class="favStar" :class="{ on: isFavorite }">
+              {{ isFavorite ? '★' : '☆' }}
+            </span>
+          </a-button>
+        </a-tooltip>
         <a-typography-text type="secondary">
           domain: {{ domain || '(none)' }}
         </a-typography-text>

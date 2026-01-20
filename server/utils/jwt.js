@@ -1,8 +1,9 @@
 import { SignJWT, jwtVerify } from 'jose'
+import { TextEncoder } from 'util'
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret'
 
-function secretKey() {
+export function secretKey() {
   return new TextEncoder().encode(SECRET)
 }
 

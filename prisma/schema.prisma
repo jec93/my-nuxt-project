@@ -63,3 +63,29 @@ model Favorite {
   @@unique([userId, menuKey])
   @@index([userId])
 }
+
+model ShareInbox {
+  id         Int      @id @default(autoincrement())
+  fromUserId String
+  toUserId   String
+  menuKey    String
+  domain     String
+  message    String?
+  status     String   @default("NEW") // NEW | READ | DISMISSED
+  createdAt  DateTime @default(now())
+  readAt     DateTime?
+
+  @@index([toUserId, status, createdAt])
+  @@index([menuKey])
+}
+
+model UserPermission {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  domain    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, domain])
+  @@index([domain])
+}
