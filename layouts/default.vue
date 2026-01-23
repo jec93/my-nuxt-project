@@ -50,9 +50,16 @@ async function acceptShare(item) {
 
   loading.value = true
   try {
-    // 1) 권한 체크
-    // (이미 /api/share/resolve가 있으면 토큰 방식 말고 권한체크 API 하나 더 만들어도 되고,
-    //  여기서는 기존 permissions/check를 사용한다고 가정)
+    // READ 처리
+    await $fetch(`/api/share/inbox/${item.id}`, {
+      method: 'PATCH',
+      body: { status: 'READ' },
+    })
+
+    // 리스트 갱신
+    await loadInbox()
+
+    // 권한 체크
     const p = await $fetch('/api/permissions/check', { query: { domain: item.domain } })
 
     if (!p?.allowed) {
@@ -60,16 +67,7 @@ async function acceptShare(item) {
       return
     }
 
-    // 2) READ 처리
-    await $fetch(`/api/share/inbox/${item.id}`, {
-      method: 'PATCH',
-      body: { status: 'READ' },
-    })
-
-    // 3) 리스트 갱신
-    await loadInbox()
-
-    // 4) 이동
+    // 이동
     router.push(`/work/grid?domain=${encodeURIComponent(item.domain)}`)
   } catch (e) {
     console.log(e)
@@ -93,6 +91,22 @@ async function rejectShare(item) {
     message.error('거절 처리에 실패했어요')
   } finally {
     loading.value = false
+  }
+}
+
+async function requestPermission(domain) {
+  try {
+    const res = await $fetch('/api/permissions/request', {
+      method: 'POST',
+      body: { domain },
+    })
+    if (res?.reason === 'ALREADY_ALLOWED') {
+      message.info('이미 권한이 있습니다.')
+    } else {
+      message.success('권한 요청을 보냈어요.')
+    }
+  } catch (e) {
+    message.error('권한 요청에 실패했어요.')
   }
 }
 </script>
@@ -188,6 +202,7 @@ async function rejectShare(item) {
       <a-layout-header class="header">
         <AppHeader />
       </a-layout-header>
+      <!--공유 알림 베너-->
       <a-alert
         v-if="showBanner"
         type="info"
@@ -229,9 +244,18 @@ async function rejectShare(item) {
 
               <div class="actions">
                 <!-- 수락(권한 체크 포함) -->
+                <a-button type="primary" size="small" @click="acceptShare(item)">
+                  수락
+                </a-button>
                 <a-tooltip title="권한이 있으면 업무 화면으로 이동합니다.">
-                  <a-button type="primary" size="small" @click="acceptShare(item)">
-                    수락
+                  <a-button size="small" @click="router.push(`/work/grid?domain=${encodeURIComponent(item.domain)}`)">
+                    이동
+                  </a-button>
+                </a-tooltip>
+
+                <a-tooltip title="권한이 없으면 요청을 보냅니다.">
+                  <a-button size="small" @click="requestPermission(item.domain)">
+                    권한요청
                   </a-button>
                 </a-tooltip>
 

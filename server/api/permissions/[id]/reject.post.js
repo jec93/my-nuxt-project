@@ -4,21 +4,19 @@ import { getAuthOrNull } from '~/server/utils/auth'
 export default defineEventHandler(async (event) => {
   const auth = await getAuthOrNull(event)
   if (!auth) throw createError({ statusCode: 401, statusMessage: 'UNAUTHENTICATED' })
+  if (auth.role !== 'ADMIN') throw createError({ statusCode: 403, statusMessage: 'FORBIDDEN' })
 
   const id = Number(getRouterParam(event, 'id'))
   const body = await readBody(event)
-  const status = String(body?.status || '') // 'READ' or 'DISMISSED'
+  const reason = String(body?.reason || '').trim()
 
-  if (!id || !['READ', 'DISMISSED'].includes(status)) {
-    throw createError({ statusCode: 400, statusMessage: 'invalid request' })
-  }
-
-  // 내 것만 수정
-  await prisma.shareInbox.updateMany({
-    where: { id, toUserId: auth.userId },
+  await prisma.permissionRequest.update({
+    where: { id },
     data: {
-      status,
-      readAt: status === 'READ' ? new Date() : null,
+      status: 'REJECTED',
+      decidedAt: new Date(),
+      decidedBy: auth.userId,
+      reason: reason || null,
     },
   })
 

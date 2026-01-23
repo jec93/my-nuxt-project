@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     return { ok: true, allowed: false, reason: 'UNAUTHENTICATED', menu }
   }
 
-  const perm = await prisma.user_permission.findFirst({
+  const perm = await prisma.userPermission.findFirst({
     where: { userId: auth.userId, domain: menu.domain, enabled: true },
     select: { id: true },
   })

@@ -83,9 +83,25 @@ model UserPermission {
   id        Int      @id @default(autoincrement())
   userId    String
   domain    String
-  enabled   Boolean  @default(true)
+  grantedBy String?  // ADMIN userId
   createdAt DateTime @default(now())
 
   @@unique([userId, domain])
   @@index([domain])
+  @@index([userId])
+}
+
+model PermissionRequest {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  domain      String
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  requestedAt DateTime @default(now())
+  decidedAt   DateTime?
+  decidedBy   String?  // ADMIN userId
+  reason      String?
+
+  @@index([status, requestedAt])
+  @@index([userId, domain])
+  @@unique([userId, domain, status])
 }
